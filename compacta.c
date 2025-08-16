@@ -7,77 +7,109 @@
 
 #define ALTURA_MAX 256
 
+// Protótipos das funções
 void calculaFrequencias(const char* nomeArquivo, unsigned long long int* arrayFrequencias);
-void gerarDicionario(char* dicionario[ALTURA_MAX], Arvore* raiz);
+void gerarDicionario(char* dicionario[ALTURA_MAX], Arvore* raiz, unsigned long long int* frequencias);
 void preencherDicionarioRecursivo(Arvore* no, char* dicionario[ALTURA_MAX], char* caminhoAtual, int profundidade);
 void serializarArvore(Arvore* raiz, bitmap* bm);
-void compactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivoSaida, Arvore* raiz, char* dicionario[]);
+void compactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivoSaida, 
+                     Arvore* raiz, char* dicionario[], unsigned long long int* frequencias);
 
 int main(int argc, char *argv[]) {
-
     if (argc != 2) {
-        printf("Use o formato: ./compacta <arquivo_entrada>\n");
+        printf("Uso: ./compacta <arquivo_entrada>\n");
         return 1;
     }
 
     const char* nomeArquivo = argv[1];
-    unsigned long long int frequencias[256]={0};
+    unsigned long long int frequencias[256] = {0};
+    
+    // Etapa 1: Calcular frequências
     calculaFrequencias(nomeArquivo, frequencias);
+    
+    // Verificar se o arquivo está vazio
+    unsigned long long int totalCaracteres = 0;
+    for (int i = 0; i < 256; i++) {
+        totalCaracteres += frequencias[i];
+    }
+    
+    if (totalCaracteres == 0) {
+        printf("Erro: Arquivo vazio!\n");
+        return 1;
+    }
 
+    // Etapa 2: Criar lista ordenada com os nós folhas
     Lista *listaHuffman = criaListaVazia();
+    int caracteresDistintos = 0;
+    
     for (int i = 0; i < 256; i++) {
         if (frequencias[i] > 0) {
             Arvore* no_folha = criaArvore((unsigned char)i, frequencias[i], NULL, NULL);
             listaHuffman = insereOrdenado(listaHuffman, no_folha);
+            caracteresDistintos++;
         }
     }
     
+    // Caso especial: arquivo com apenas 1 tipo de caractere
+    if (caracteresDistintos == 1) {
+        // Adiciona um nó fictício com frequência 0
+        unsigned char charFicticio = 0;
+        // Encontra um caractere não usado
+        for (int i = 0; i < 256; i++) {
+            if (frequencias[i] == 0) {
+                charFicticio = (unsigned char)i;
+                break;
+            }
+        }
+        Arvore* no_ficticio = criaArvore(charFicticio, 0, NULL, NULL);
+        listaHuffman = insereOrdenado(listaHuffman, no_ficticio);
+    }
     
+    // Etapa 3: Construir a árvore de Huffman
     while (!verificaListaUmElemento(listaHuffman)) {
-
         Arvore* no1 = removePrimeiroLista(&listaHuffman);
         Arvore* no2 = removePrimeiroLista(&listaHuffman);
-
+        
         unsigned long long int freq_pai = frequenciaArvore(no1) + frequenciaArvore(no2);
-        Arvore* no_interno = criaArvore('*', freq_pai, no1, no2);
+        Arvore* no_interno = criaArvore('\0', freq_pai, no1, no2);
         listaHuffman = insereOrdenado(listaHuffman, no_interno);
-
     }
 
     Arvore* arvoreHuffman = removePrimeiroLista(&listaHuffman);
 
+    // Etapa 4: Gerar dicionário de códigos
     char* dicionario[ALTURA_MAX] = {NULL};
-    gerarDicionario(dicionario, arvoreHuffman);
+    gerarDicionario(dicionario, arvoreHuffman, frequencias);
 
-    // --- PARTE NOVA: COMPACTAÇÃO ---
-    // Cria o nome do arquivo de saída (ex: entrada.txt -> entrada.txt.comp)
+    // Etapa 5: Compactar o arquivo
     char nomeArquivoSaida[1024];
-    strcpy(nomeArquivoSaida, nomeArquivo);
-    strcat(nomeArquivoSaida, ".comp");
-
-    // Chama a função principal de compactação
-    compactarArquivo(nomeArquivo, nomeArquivoSaida, arvoreHuffman, dicionario);
-
-    printf("Arvore Huffman criada com sucesso! Frequencia da raiz: %llu\n", frequenciaArvore(arvoreHuffman));
+    snprintf(nomeArquivoSaida, sizeof(nomeArquivoSaida), "%s.comp", nomeArquivo);
     
-    // Libera a lista (deve estar vazia, mas por segurança)
+    compactarArquivo(nomeArquivo, nomeArquivoSaida, arvoreHuffman, dicionario, frequencias);
+
+    // Estatísticas
+    printf("\n=== COMPACTAÇÃO CONCLUÍDA ===\n");
+    printf("Arquivo original: %s\n", nomeArquivo);
+    printf("Arquivo compactado: %s\n", nomeArquivoSaida);
+    printf("Caracteres distintos: %d\n", caracteresDistintos);
+    printf("Total de caracteres: %llu\n", totalCaracteres);
+    
+    // Limpeza de memória
     liberaLista(listaHuffman);
-    
-    // Libera a árvore
     liberaArvore(arvoreHuffman);
-
+    
     for(int i = 0; i < ALTURA_MAX; i++) {
         if(dicionario[i] != NULL) {
             free(dicionario[i]);
         }
     }
+    
     return 0;
-
 }
 
 void calculaFrequencias(const char* nomeArquivo, unsigned long long int* arrayFrequencias) {
     FILE* arquivo = fopen(nomeArquivo, "rb");
-
+    
     if (arquivo == NULL) {
         perror("Erro ao abrir o arquivo de entrada");
         exit(1);
@@ -90,12 +122,21 @@ void calculaFrequencias(const char* nomeArquivo, unsigned long long int* arrayFr
 
     if (ferror(arquivo)) {
         perror("Erro durante a leitura do arquivo");
+        fclose(arquivo);
+        exit(1);
     }
 
     fclose(arquivo);
 }
 
-void gerarDicionario(char* dicionario[], Arvore* raiz) {
+void gerarDicionario(char* dicionario[], Arvore* raiz, unsigned long long int* frequencias) {
+    // Caso especial: árvore com apenas um nó (arquivo com 1 caractere único)
+    if (ehFolha(raiz)) {
+        unsigned char c = caractereArvore(raiz);
+        dicionario[c] = strdup("0");  // Código arbitrário "0"
+        return;
+    }
+    
     char caminhoAtual[ALTURA_MAX];
     preencherDicionarioRecursivo(raiz, dicionario, caminhoAtual, 0);
 }
@@ -105,19 +146,23 @@ void preencherDicionarioRecursivo(Arvore* no, char* dicionario[], char* caminhoA
         return;
     }
 
-    // Se é uma folha, armazena o caminho (código) no dicionário
     if (ehFolha(no)) {
         unsigned char c = caractereArvore(no);
         caminhoAtual[profundidade] = '\0';
-        dicionario[c] = strdup(caminhoAtual); // strdup aloca memória e copia a string
+        
+        // Só adiciona ao dicionário se o caractere existe no arquivo
+        // (evita adicionar o nó fictício)
+        if (profundidade > 0 || caminhoAtual[0] != '\0') {
+            dicionario[c] = strdup(caminhoAtual);
+        }
         return;
     }
 
-    // Navega para a esquerda, adicionando '0' ao caminho
+    // Navega para a esquerda com '0'
     caminhoAtual[profundidade] = '0';
     preencherDicionarioRecursivo(getEsq(no), dicionario, caminhoAtual, profundidade + 1);
 
-    // Navega para a direita, adicionando '1' ao caminho
+    // Navega para a direita com '1'
     caminhoAtual[profundidade] = '1';
     preencherDicionarioRecursivo(getDir(no), dicionario, caminhoAtual, profundidade + 1);
 }
@@ -128,81 +173,102 @@ void serializarArvore(Arvore* raiz, bitmap* bm) {
     }
 
     if (ehFolha(raiz)) {
-        bitmapAppendLeastSignificantBit(bm, 1); // Marca que é folha
+        // Bit 1 indica folha
+        bitmapAppendLeastSignificantBit(bm, 1);
+        
+        // Escreve o caractere (8 bits)
         unsigned char c = caractereArvore(raiz);
-        // Adiciona os 8 bits do caractere
         for (int i = 7; i >= 0; i--) {
-            // Pega bit a bit do caractere e adiciona ao bitmap
             unsigned char bit = (c >> i) & 1;
             bitmapAppendLeastSignificantBit(bm, bit);
         }
     } else {
-        bitmapAppendLeastSignificantBit(bm, 0); // Marca que é nó interno
+        // Bit 0 indica nó interno
+        bitmapAppendLeastSignificantBit(bm, 0);
         serializarArvore(getEsq(raiz), bm);
         serializarArvore(getDir(raiz), bm);
     }
 }
 
-/**
- * @brief Orquestra a escrita do arquivo compactado final.
- * @param nomeArquivoEntrada Arquivo original a ser lido.
- * @param nomeArquivoSaida Arquivo .comp a ser criado.
- * @param raiz A raiz da árvore de Huffman para serialização.
- * @param dicionario O dicionário de códigos para a compactação.
- */
-void compactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivoSaida, Arvore* raiz, char* dicionario[]) {
-    // 1. Serializar a árvore num bitmap
-    bitmap* bitmapArvore = bitmapInit(2560); 
+void compactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivoSaida, 
+                     Arvore* raiz, char* dicionario[], unsigned long long int* frequencias) {
+    
+    // 1. Serializar a árvore
+    bitmap* bitmapArvore = bitmapInit(256 * 9 + 256);  // Máximo: 256 folhas * 9 bits + nós internos
     serializarArvore(raiz, bitmapArvore);
-    printf("Fez a serializacao da arvore\n");
-    // 2. Criar um bitmap para os dados codificados
-
-    FILE* tamanhoArquivo = fopen(nomeArquivoEntrada, "rb");
-
-    unsigned long long int tamanhoTotalBits = 0;
-    unsigned char byteContador;
-    while (fread(&byteContador, sizeof(unsigned char), 1, tamanhoArquivo) == 1) {
-        tamanhoTotalBits += 8;
+    
+    // 2. Calcular tamanho necessário para os dados comprimidos
+    unsigned long long int tamanhoComprimidoBits = 0;
+    for (int i = 0; i < 256; i++) {
+        if (frequencias[i] > 0 && dicionario[i] != NULL) {
+            tamanhoComprimidoBits += frequencias[i] * strlen(dicionario[i]);
+        }
     }
-    fclose(tamanhoArquivo);
     
+    // 3. Criar bitmap para os dados codificados
+    bitmap* bitmapDados = bitmapInit(tamanhoComprimidoBits + 8);
     
-
-    bitmap* bitmapDados = bitmapInit(tamanhoTotalBits); // 8 MB de buffer, por exemplo
-
-    // 3. Ler o arquivo de entrada novamente e codificar os dados
+    // 4. Codificar o arquivo
     FILE* arquivoEntrada = fopen(nomeArquivoEntrada, "rb");
     if (!arquivoEntrada) {
-        perror("Erro ao reabrir arquivo de entrada para compactar");
+        perror("Erro ao reabrir arquivo de entrada");
         exit(1);
     }
-
+    
     unsigned char byte;
     while (fread(&byte, sizeof(unsigned char), 1, arquivoEntrada) == 1) {
         char* codigo = dicionario[byte];
-        for (int i = 0; codigo[i] != '\0'; i++) {
-            bitmapAppendLeastSignificantBit(bitmapDados, codigo[i] - '0');
+        if (codigo != NULL) {
+            for (int i = 0; codigo[i] != '\0'; i++) {
+                bitmapAppendLeastSignificantBit(bitmapDados, codigo[i] - '0');
+            }
         }
     }
     fclose(arquivoEntrada);
-
-    // 4. Escrever tudo no arquivo de saída
+    
+    // 5. Escrever arquivo compactado
     FILE* arquivoSaida = fopen(nomeArquivoSaida, "wb");
     if (!arquivoSaida) {
-        perror("Erro ao criar arquivo de saida");
+        perror("Erro ao criar arquivo de saída");
         exit(1);
     }
-
-    // Escreve primeiro a árvore serializada
-    fwrite(bitmapGetContents(bitmapArvore), sizeof(unsigned char), (bitmapGetLength(bitmapArvore) + 7) / 8, arquivoSaida);
+    
+    // Escrever cabeçalho
+    unsigned int tamanhoArvore = bitmapGetLength(bitmapArvore);
+    unsigned int tamanhoDados = bitmapGetLength(bitmapDados);
+    
+    // Escreve tamanho da árvore (4 bytes)
+    fwrite(&tamanhoArvore, sizeof(unsigned int), 1, arquivoSaida);
+    
+    // Escreve número de bits válidos no último byte dos dados
+    unsigned char bitsUltimoByte = tamanhoDados % 8;
+    if (bitsUltimoByte == 0) bitsUltimoByte = 8;
+    fwrite(&bitsUltimoByte, sizeof(unsigned char), 1, arquivoSaida);
+    
+    // Escreve a árvore serializada
+    unsigned int bytesArvore = (tamanhoArvore + 7) / 8;
+    fwrite(bitmapGetContents(bitmapArvore), sizeof(unsigned char), bytesArvore, arquivoSaida);
+    
     // Escreve os dados codificados
-    fwrite(bitmapGetContents(bitmapDados), sizeof(unsigned char), (bitmapGetLength(bitmapDados) + 7) / 8, arquivoSaida);
-
+    unsigned int bytesDados = (tamanhoDados + 7) / 8;
+    fwrite(bitmapGetContents(bitmapDados), sizeof(unsigned char), bytesDados, arquivoSaida);
+    
     fclose(arquivoSaida);
-
-    // Libera os bitmaps
+    
+    // Calcular taxa de compressão
+    unsigned long long int tamanhoOriginal = 0;
+    for (int i = 0; i < 256; i++) {
+        tamanhoOriginal += frequencias[i];
+    }
+    
+    unsigned long long int tamanhoComprimido = 5 + bytesArvore + bytesDados;  // 5 = cabeçalho
+    double taxaCompressao = ((double)(tamanhoOriginal - tamanhoComprimido) / tamanhoOriginal) * 100;
+    
+    printf("Tamanho original: %llu bytes\n", tamanhoOriginal);
+    printf("Tamanho comprimido: %llu bytes\n", tamanhoComprimido);
+    printf("Taxa de compressão: %.2f%%\n", taxaCompressao > 0 ? taxaCompressao : 0);
+    
+    // Liberar bitmaps
     bitmapLibera(bitmapArvore);
     bitmapLibera(bitmapDados);
-
-    printf("\nArquivo compactado com sucesso em: %s\n", nomeArquivoSaida);
 }
