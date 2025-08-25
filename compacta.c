@@ -88,11 +88,11 @@ int main(int argc, char *argv[]) {
     compactarArquivo(nomeArquivo, nomeArquivoSaida, arvoreHuffman, dicionario, frequencias);
 
     // Estatísticas
-    printf("\n=== COMPACTAÇÃO CONCLUÍDA ===\n");
-    printf("Arquivo original: %s\n", nomeArquivo);
-    printf("Arquivo compactado: %s\n", nomeArquivoSaida);
-    printf("Caracteres distintos: %d\n", caracteresDistintos);
-    printf("Total de caracteres: %llu\n", totalCaracteres);
+    // printf("\n=== COMPACTAÇÃO CONCLUÍDA ===\n");
+    // printf("Arquivo original: %s\n", nomeArquivo);
+    // printf("Arquivo compactado: %s\n", nomeArquivoSaida);
+    // printf("Caracteres distintos: %d\n", caracteresDistintos);
+    // printf("Total de caracteres: %llu\n", totalCaracteres);
     
     // Limpeza de memória
     liberaLista(listaHuffman);
@@ -237,7 +237,6 @@ void compactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivoSai
     unsigned int tamanhoArvore = bitmapGetLength(bitmapArvore);
     unsigned int tamanhoDados = bitmapGetLength(bitmapDados);
     
-    // Escreve tamanho da árvore (4 bytes)
     fwrite(&tamanhoArvore, sizeof(unsigned int), 1, arquivoSaida);
     
     // Escreve número de bits válidos no último byte dos dados

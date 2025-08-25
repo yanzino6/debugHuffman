@@ -32,10 +32,6 @@ int main(int argc, char* argv[]) {
     // Descompacta o arquivo
     descompactarArquivo(nomeArquivoCompactado, nomeArquivoSaida);
     
-    printf("\n=== DESCOMPACTAÇÃO CONCLUÍDA ===\n");
-    printf("Arquivo compactado: %s\n", nomeArquivoCompactado);
-    printf("Arquivo descompactado: %s\n", nomeArquivoSaida);
-    
     return 0;
 }
 
@@ -91,9 +87,6 @@ void descompactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivo
         fclose(arquivoEntrada);
         exit(1);
     }
-    
-    printf("Tamanho da árvore: %u bits\n", tamanhoArvore);
-    printf("Bits válidos no último byte: %u\n", bitsUltimoByte);
     
     // 2. Ler a árvore serializada
     unsigned int bytesArvore = (tamanhoArvore + 7) / 8;
@@ -174,7 +167,6 @@ void descompactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivo
     bitmapLibera(bitmapDados);
     liberaArvore(raiz);
     
-    printf("Descompactação concluída com sucesso!\n");
 }
 
 void decodificarDados(FILE* arquivoSaida, bitmap* bitmapDados, Arvore* raiz, unsigned int numBitsValidos) {
