@@ -8,6 +8,12 @@
 Arvore* desserializarArvore(bitmap* bm, unsigned int* posicao);
 void descompactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivoSaida);
 void decodificarDados(FILE* arquivoSaida, bitmap* bitmapDados, Arvore* raiz, unsigned int numBitsValidos);
+/**
+ * @brief Programa de descompactação do formato .comp gerado por compacta.c.
+ * @param argc Espera 2 argumentos.
+ * @param argv argv[1] = caminho do arquivo .comp.
+ * @return 0 em sucesso; 1 em erro de uso/extensão; aborta em erros de E/S.
+ */
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -34,6 +40,12 @@ int main(int argc, char* argv[]) {
     
     return 0;
 }
+/**
+ * @brief Reconstrói a árvore a partir do bitmap serializado (pré-ordem).
+ * @param bm Bitmap contendo a árvore.
+ * @param posicao Índice do próximo bit a ler (atualizado por referência).
+ * @return Raiz da árvore reconstruída ou NULL em erro.
+ */
 
 Arvore* desserializarArvore(bitmap* bm, unsigned int* posicao) {
     // Verifica se ainda há bits para ler
@@ -64,6 +76,12 @@ Arvore* desserializarArvore(bitmap* bm, unsigned int* posicao) {
         return criaArvore('\0', 0, esq, dir);
     }
 }
+/**
+ * @brief Lê o arquivo .comp e reconstroi árvore e dados, gerando o arquivo original.
+ * @param nomeArquivoEntrada Caminho do .comp.
+ * @param nomeArquivoSaida Caminho do arquivo de saída (sem .comp).
+ * @details Fluxo: cabeçalho → bitmap da árvore → desserialização → bitmap dos dados → decodificação.
+ */
 
 void descompactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivoSaida) {
     FILE* arquivoEntrada = fopen(nomeArquivoEntrada, "rb");
@@ -168,6 +186,13 @@ void descompactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivo
     liberaArvore(raiz);
     
 }
+/**
+ * @brief Interpreta os bits de dados caminhando pela árvore e escreve bytes decodificados.
+ * @param arquivoSaida Arquivo de saída aberto (binário).
+ * @param bitmapDados Bits dos dados comprimidos.
+ * @param raiz Árvore de Huffman.
+ * @param numBitsValidos Número de bits válidos em bitmapDados.
+ */
 
 void decodificarDados(FILE* arquivoSaida, bitmap* bitmapDados, Arvore* raiz, unsigned int numBitsValidos) {
     // Caso especial: árvore com apenas um nó (arquivo original tinha 1 caractere único)

@@ -91,6 +91,12 @@ struct celula {
     }
     printf("--- FIM DA LISTA ---\n");
  }
+/**
+ * @brief Libera todos os nós (células) da lista.
+ * @param l Cabeça da lista.
+ * @post A lista é descartada; não libera as árvores apontadas.
+ * @complexity O(k).
+ */
 
  void liberaLista(Lista *l) {
     while (l != NULL) {

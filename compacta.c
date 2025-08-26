@@ -14,6 +14,14 @@ void preencherDicionarioRecursivo(Arvore* no, char* dicionario[ALTURA_MAX], char
 void serializarArvore(Arvore* raiz, bitmap* bm);
 void compactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivoSaida, 
                      Arvore* raiz, char* dicionario[], unsigned long long int* frequencias);
+/**
+ * @brief Programa de compactação por Huffman.
+ * @details Fluxo: calcula frequências; monta lista ordenada; constrói árvore; gera dicionário; serializa árvore;
+ *          codifica entrada; grava cabeçalho e bitmaps no arquivo <entrada>.comp.
+ * @param argc Espera 2 argumentos.
+ * @param argv argv[1] = caminho do arquivo de entrada.
+ * @return 0 em sucesso; 1 em erro de uso; aborta em erros de E/S.
+ */
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -27,15 +35,9 @@ int main(int argc, char *argv[]) {
     // Etapa 1: Calcular frequências
     calculaFrequencias(nomeArquivo, frequencias);
     
-    // Verificar se o arquivo está vazio
     unsigned long long int totalCaracteres = 0;
     for (int i = 0; i < 256; i++) {
         totalCaracteres += frequencias[i];
-    }
-    
-    if (totalCaracteres == 0) {
-        printf("Erro: Arquivo vazio!\n");
-        return 1;
     }
 
     // Etapa 2: Criar lista ordenada com os nós folhas
@@ -106,6 +108,11 @@ int main(int argc, char *argv[]) {
     
     return 0;
 }
+/**
+ * @brief Varre o arquivo e acumula em @p arrayFrequencias a contagem por byte (0..255).
+ * @param nomeArquivo Caminho do arquivo a ler (modo binário).
+ * @param arrayFrequencias Vetor de 256 posições (unsigned long long) inicializado com zeros.
+ */
 
 void calculaFrequencias(const char* nomeArquivo, unsigned long long int* arrayFrequencias) {
     FILE* arquivo = fopen(nomeArquivo, "rb");
@@ -128,6 +135,14 @@ void calculaFrequencias(const char* nomeArquivo, unsigned long long int* arrayFr
 
     fclose(arquivo);
 }
+/**
+ * @brief Cria o dicionário de códigos binários para cada byte presente.
+ * @details Caso a árvore possua uma única folha (apenas um símbolo), o símbolo recebe código "0" e um nó
+ *          fictício é criado no compressor para viabilizar a codificação.
+ * @param dicionario Vetor de 256 ponteiros para strings (serão alocadas com strdup).
+ * @param raiz Raiz da árvore de Huffman.
+ * @param frequencias Vetor de frequências para filtrar símbolos inexistentes.
+ */
 
 void gerarDicionario(char* dicionario[], Arvore* raiz, unsigned long long int* frequencias) {
     // Caso especial: árvore com apenas um nó (arquivo com 1 caractere único)
@@ -140,6 +155,13 @@ void gerarDicionario(char* dicionario[], Arvore* raiz, unsigned long long int* f
     char caminhoAtual[ALTURA_MAX];
     preencherDicionarioRecursivo(raiz, dicionario, caminhoAtual, 0);
 }
+/**
+ * @brief Percorre a árvore (pré-ordem) acumulando '0' (esq) e '1' (dir) até folhas.
+ * @param no Nó atual.
+ * @param dicionario Vetor de 256 strings a preencher.
+ * @param caminhoAtual Buffer temporário (stack) contendo o caminho acumulado.
+ * @param profundidade Posição atual no @p caminhoAtual.
+ */
 
 void preencherDicionarioRecursivo(Arvore* no, char* dicionario[], char* caminhoAtual, int profundidade) {
     if (no == NULL) {
@@ -166,6 +188,12 @@ void preencherDicionarioRecursivo(Arvore* no, char* dicionario[], char* caminhoA
     caminhoAtual[profundidade] = '1';
     preencherDicionarioRecursivo(getDir(no), dicionario, caminhoAtual, profundidade + 1);
 }
+/**
+ * @brief Serializa a árvore em pré-ordem no bitmap.
+ * @details Protocolo: 1 bit = 1 para folha + 8 bits do caractere; 0 para nó interno.
+ * @param raiz Raiz da árvore.
+ * @param bm Bitmap de saída.
+ */
 
 void serializarArvore(Arvore* raiz, bitmap* bm) {
     if (raiz == NULL) {
@@ -189,6 +217,15 @@ void serializarArvore(Arvore* raiz, bitmap* bm) {
         serializarArvore(getDir(raiz), bm);
     }
 }
+/**
+ * @brief Gera o arquivo .comp: cabeçalho + árvore serializada + dados codificados.
+ * @param nomeArquivoEntrada Caminho do arquivo original.
+ * @param nomeArquivoSaida Caminho do arquivo de saída (.comp).
+ * @param raiz Árvore de Huffman.
+ * @param dicionario Tabela de códigos por byte.
+ * @param frequencias Frequências por byte (para estimar tamanho e estatísticas).
+ * @details Cabeçalho: [4 bytes: tamArvoreBits] [1 byte: bitsVálidosÚltimoByteDados].
+ */
 
 void compactarArquivo(const char* nomeArquivoEntrada, const char* nomeArquivoSaida, 
                      Arvore* raiz, char* dicionario[], unsigned long long int* frequencias) {
